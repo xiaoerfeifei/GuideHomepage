@@ -3026,6 +3026,8 @@
                 selectedRoleIds.push(checkbox.value);
             });
             
+            console.log('【调试日志】已选角色列表:', selectedRoleIds);
+            
             // 检查是否至少选择了一个角色
             if (selectedRoleIds.length === 0 && dirRolesJson.length === 0) {
                 alert("请至少选择一个角色！");
@@ -4461,17 +4463,6 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
             const dirRolesContainer = document.getElementById('dir-roles-container');
 
             if (!dirColumns) return;
-
-            // 对dirRolesJson进行去重，基于role.id
-            const uniqueRolesMap = new Map();
-            if (dirRolesJson && dirRolesJson.length > 0) {
-                dirRolesJson.forEach(role => {
-                    if (role && role.id && !uniqueRolesMap.has(role.id)) {
-                        uniqueRolesMap.set(role.id, role);
-                    }
-                });
-                dirRolesJson = Array.from(uniqueRolesMap.values());
-            }
 
             // 如果没有自制角色，隐藏容器
             if (!dirRolesJson || dirRolesJson.length === 0) {
@@ -8220,9 +8211,6 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
             const selectedCheckboxes = document.querySelectorAll('.role-item input[type="checkbox"]:checked');
             let selectedRoles = [];
             
-            console.log('[updateSelectedRolesDisplay] 开始更新已选角色显示');
-            console.log('[updateSelectedRolesDisplay] 选中的复选框数量:', selectedCheckboxes.length);
-            
             selectedCheckboxes.forEach(checkbox => {
                 const roleItem = checkbox.closest('.role-item');
                 const img = roleItem.querySelector('img');
@@ -8257,24 +8245,49 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
                 });
             });
 
-            console.log('[updateSelectedRolesDisplay] 通过复选框获取的角色:', JSON.stringify(selectedRoles.map(r => ({id: r.id, name: r.name}))));
-            
-            // 注意：不再自动添加 dirRolesJson 中的角色
-            // 只有通过复选框选中的角色才应该显示在已选角色区域
-            console.log('[updateSelectedRolesDisplay] dirRolesJson 长度:', dirRolesJson.length);
-            console.log('[updateSelectedRolesDisplay] dirRolesJson 内容:', JSON.stringify(dirRolesJson.map(r => ({id: r.id, name: r.name}))));
-            
-            console.log('[updateSelectedRolesDisplay] 最终已选角色:', JSON.stringify(selectedRoles.map(r => ({id: r.id, name: r.name}))));
-            
-            // 检查是否有重复
-            const idCount = {};
-            selectedRoles.forEach(r => {
-                idCount[r.id] = (idCount[r.id] || 0) + 1;
+            // 添加自制角色（只有勾选了复选框的才添加，且去重）
+            console.log('【调试日志】updateSelectedRolesDisplay - dirRolesJson:', dirRolesJson);
+            const alreadyAddedIds = selectedRoles.map(r => r.id);
+            console.log('【调试日志】已添加的角色ID:', alreadyAddedIds);
+            dirRolesJson.forEach(role => {
+                // 检查该自制角色的复选框是否被勾选
+                const checkbox = document.querySelector(`.role-item input[type="checkbox"][value="${role.id}"]`);
+                if (!checkbox || !checkbox.checked) {
+                    console.log('【调试日志】自制角色未勾选，跳过:', role.id, role.name);
+                    return;
+                }
+                // 去重：已从checkbox添加过的跳过
+                if (alreadyAddedIds.includes(role.id)) {
+                    console.log('【调试日志】跳过重复的自制角色:', role.id, role.name);
+                    return;
+                }
+                console.log('【调试日志】添加自制角色到显示:', role.id, role.name);
+                // 从角色数据中获取团队信息
+                let category = '其他';
+                const team = role.team || '';
+                
+                if (team === 'townsfolk' || team === '镇民') {
+                    category = '镇民';
+                } else if (team === 'outsider' || team === '外来者') {
+                    category = '外来者';
+                } else if (team === 'minion' || team === '爪牙') {
+                    category = '爪牙';
+                } else if (team === 'demon' || team === '恶魔') {
+                    category = '恶魔';
+                } else if (team === 'traveller' || team === '旅行者') {
+                    category = '旅行者';
+                } else if (team === 'fabled' || team === '传奇') {
+                    category = '传奇';
+                }
+                
+                selectedRoles.push({
+                    id: role.id,
+                    name: role.name,
+                    image: role.image || '',
+                    ability: role.ability || '',
+                    category: category
+                });
             });
-            const duplicates = Object.entries(idCount).filter(([id, count]) => count > 1);
-            if (duplicates.length > 0) {
-                console.warn('[updateSelectedRolesDisplay] 发现重复角色:', duplicates);
-            }
 
             // 按类别分组（保持原有顺序）
             const rolesByCategory = {};
@@ -9330,20 +9343,27 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
 
         // 切换角色选择状态
         function toggleRoleSelection(roleId) {
-            console.log('[toggleRoleSelection] 尝试取消角色:', roleId);
+            console.log('【调试日志】toggleRoleSelection 被调用, roleId:', roleId);
+            console.log('【调试日志】toggleRoleSelection - 当前 dirRolesJson:', dirRolesJson);
             
-            // 处理所有角色的复选框（包括标准角色和自制角色）
+            // 处理标准角色
             const checkbox = document.querySelector(`.role-item input[type="checkbox"][value="${roleId}"]`);
             if (checkbox) {
                 checkbox.checked = false;
-                console.log('[toggleRoleSelection] 取消复选框勾选:', roleId);
                 updateSelectedRolesDisplay();
                 saveToLocalStorage();
                 return;
             }
             
-            // 如果没有找到复选框，可能是一个特殊情况
-            console.warn('[toggleRoleSelection] 未找到角色的复选框:', roleId);
+            // 处理自制角色
+            if (typeof dirRolesJson !== 'undefined') {
+                const roleIndex = dirRolesJson.findIndex(role => role.id === roleId);
+                if (roleIndex !== -1) {
+                    dirRolesJson.splice(roleIndex, 1);
+                    updateSelectedRolesDisplay();
+                    saveToLocalStorage();
+                }
+            }
         }
 
         // 图片懒加载和重试机制
@@ -10243,14 +10263,15 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
 
         // 处理加载的JSON数据
         function processLoadedJson(jsonData) {
-            // 清空现有选择dir
-
-            // document.querySelectorAll('.role-item input[type="checkbox"]').forEach(checkbox => {
-            //     checkbox.checked = false;
-            // });
-            //tpiRolesId = [];
-            // selectedRoles = [];
-            // dirRolesJson = [];
+            // 清空现有选择
+            document.querySelectorAll('.role-item input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            tpiRolesId = [];
+            selectedRoles = [];
+            console.log('【调试日志】导入前 dirRolesJson:', dirRolesJson);
+            // 不再清空dirRolesJson，而是合并新导入的自制角色
+            
             metaInfoJson = {
                 "id": "_meta",//required
                 "name": "",//required
@@ -10440,9 +10461,16 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
                 // 处理自定义角色
                 else{
                     console.log("dirRolesPath");
-                    // 添加到dirRolesJson中，同时也添加到selectedRoles中
-                    // 这样自定义角色也能显示在已选角色中
-                    dirRolesJson.push(item);
+                    console.log('【调试日志】导入自制角色:', item.id, item.name);
+                    // 检查是否已存在（根据id判断），避免重复添加
+                    const existingIndex = dirRolesJson.findIndex(r => r.id === item.id);
+                    if (existingIndex !== -1) {
+                        console.log('【调试日志】自制角色已存在，更新:', item.id);
+                        dirRolesJson[existingIndex] = item;
+                    } else {
+                        console.log('【调试日志】新增自制角色:', item.id);
+                        dirRolesJson.push(item);
+                    }
                     selectedRoles.push(item);
                 }
             });
@@ -10458,6 +10486,20 @@ const allRoles = [...townsfolkRoles, ...outsidersRoles, ...minionsRoles, ...demo
             // 更新选择计数和已选角色显示
             updateSelectionCount();
             updateSelectedRolesDisplay();
+            // 渲染自制角色列表
+            loadDirRoles();
+            // 勾选导入的自制角色
+            const importedRoleIds = selectedRoles.filter(role => dirRolesJson.some(r => r.id === role.id)).map(role => role.id);
+            console.log('【调试日志】需要勾选的自制角色ID:', importedRoleIds);
+            importedRoleIds.forEach(roleId => {
+                const checkbox = document.querySelector(`.role-item input[type="checkbox"][value="${roleId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    const roleItem = checkbox.closest('.role-item');
+                    if (roleItem) roleItem.classList.remove('hidden');
+                    console.log('【调试日志】已勾选:', roleId);
+                }
+            });
         }
 
         function toggleJsonUpload() {
